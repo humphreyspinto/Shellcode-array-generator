@@ -2,10 +2,11 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <regex>
 #include <string>
 #include <string.h>
 
-enum class LANG{
+enum class LANG_ID{
 	PYTHON,
 	CPP,
 	VBSCRIPT,
@@ -18,12 +19,15 @@ struct Shellcode {
 	size_t shellcodeLen{0};
 
 	~Shellcode() {
-		if(shellcodeData)
+		if(shellcodeData != nullptr)
 			delete[] shellcodeData;
 	}
 };
 
-static Shellcode* pShellCode;
+static Shellcode* g_pShellCode;
+static std::map<std::string const, LANG_ID> g_Languages{ {"python", LANG_ID::PYTHON}, 
+	{"cpp", LANG_ID::CPP}, {"vbscript", LANG_ID::VBSCRIPT}, {"javascript", LANG_ID::JAVASCRIPT}, 
+		{"powershell", LANG_ID::POWERSHELL} };
 
 bool parse_pe_file(std::string const& pe_file) {
 	PIMAGE_DOS_HEADER DH; // pe file dos header
@@ -36,8 +40,8 @@ bool parse_pe_file(std::string const& pe_file) {
 		return false;
 	}
 
-	pShellCode = new Shellcode();
-	if (pShellCode != nullptr) {
+	g_pShellCode = new Shellcode();
+	if (g_pShellCode != nullptr) {
 		DWORD fileSize = GetFileSize(hPE, 0);
 		PBYTE pBuffer = new BYTE[fileSize];
 		DWORD bRead = 0;
@@ -49,7 +53,7 @@ bool parse_pe_file(std::string const& pe_file) {
 
 		DH = reinterpret_cast<PIMAGE_DOS_HEADER>(pBuffer);
 		if (DH->e_magic != IMAGE_DOS_SIGNATURE) {
-			std::cerr << "[*]File is not a pe file. Exiting...\n";
+			std::cerr << "[*]File is not a valid pe file might be corrupted. Exiting...\n";
 			return false;
 		}
 
@@ -59,21 +63,21 @@ bool parse_pe_file(std::string const& pe_file) {
 			return false;
 		}
 
-		/*Get number of sections must be equal to 1*/
+		/*Get number of sections. must be equal to 1*/
 		WORD number_of_sections = NH->FileHeader.NumberOfSections;
 		if (number_of_sections == 1) {
 			const char* pSectionName = ".flat";
 			SH = reinterpret_cast<PIMAGE_SECTION_HEADER>(DWORD(pBuffer) + DH->e_lfanew + 248 + (1*40));
 			if (memcmp(SH->Name, pSectionName, strlen(pSectionName))) {
-				pShellCode->shellcodeData = new BYTE[SH->SizeOfRawData];
-				void* dest = memcpy(pShellCode->shellcodeData, (pBuffer + SH->PointerToRawData), SH->SizeOfRawData);
+				g_pShellCode->shellcodeData = new BYTE[SH->SizeOfRawData];
+				void* dest = memcpy(g_pShellCode->shellcodeData, (pBuffer + SH->PointerToRawData), SH->SizeOfRawData);
 				if (dest) {
-					pShellCode->shellcodeLen = strlen(reinterpret_cast<char*>(pShellCode->shellcodeData));
+					g_pShellCode->shellcodeLen = strlen(reinterpret_cast<char*>(g_pShellCode->shellcodeData));
 					std::cout << "[*].flat section successfully copied "<< SH->SizeOfRawData << "to buffer\n";
 					return true;
 				}
 				std::cerr << "[*]Unable to copy section data\n";
-				delete[] pShellCode->shellcodeData;
+				delete[] g_pShellCode->shellcodeData;
 			}
 		}
 	}
@@ -82,7 +86,7 @@ bool parse_pe_file(std::string const& pe_file) {
 }
 
 bool generate_shellcode_array(std::string const& save_to, std::string const& arr_name, std::string const& lang) {
-	if (pShellCode->shellcodeData == nullptr)
+	if (g_pShellCode->shellcodeData == nullptr)
 		return false;
 	std::ofstream out(save_to);
 	if (!out.is_open()) {
@@ -91,14 +95,14 @@ bool generate_shellcode_array(std::string const& save_to, std::string const& arr
 	}
 	out << "unsigned char " << arr_name.c_str() << " = {";
 	
-	PBYTE shellcode = new BYTE[pShellCode->shellcodeLen];
-	ZeroMemory(shellcode, pShellCode->shellcodeLen);
+	PBYTE shellcode = new BYTE[g_pShellCode->shellcodeLen];
+	ZeroMemory(shellcode, g_pShellCode->shellcodeLen);
 
-	void* dest = memcpy(shellcode, reinterpret_cast<PBYTE>(pShellCode->shellcodeData), pShellCode->shellcodeLen);
+	void* dest = memcpy(shellcode, reinterpret_cast<PBYTE>(g_pShellCode->shellcodeData), g_pShellCode->shellcodeLen);
 	if (dest == nullptr) {
 		return false;
 	}
-	for (int i = 0; i < pShellCode->shellcodeLen; i++) {
+	for (int i = 0; i < g_pShellCode->shellcodeLen; i++) {
 		if (i != 0)out << ',';
 		if (i % 12)out << "\n\t";
 		out << std::hex << "0x" << shellcode[i];
@@ -121,12 +125,14 @@ int main(int argc, char** argv) {
 	std::string const array_name(argv[2]);
 	std::string const lang(argv[3]);
 
+	//validate input with regexes
+
 	bool bSuccess = parse_pe_file(input_file) && 
 		generate_shellcode_array(output_file, array_name, lang);
 
 	bSuccess ? std::cout << "Successfully created shellcode array from pe file "<<
 		input_file << '\n': std::cerr << "Unable to parse pe file and create shellcode array\n";
 
-	delete pShellCode;
+	delete g_pShellCode;
 	return 0;
 }
