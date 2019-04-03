@@ -102,7 +102,7 @@ bool generate_shellcode_array(std::string const& save_to, std::string const& arr
 	if (dest == nullptr) {
 		return false;
 	}
-	for (int i = 0; i < g_pShellCode->shellcodeLen; i++) {
+	for (unsigned int i = 0; i < g_pShellCode->shellcodeLen; i++) {
 		if (i != 0)out << ',';
 		if (i % 12)out << "\n\t";
 		out << std::hex << "0x" << shellcode[i];
@@ -112,26 +112,31 @@ bool generate_shellcode_array(std::string const& save_to, std::string const& arr
 
 	delete[] shellcode;
 	out.close();
+
+	return true;
 }
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
-		std::cerr << "Usage: " <<  argv[0] << "[input_file] [lang] [array_name] [ output_file]\n";
+		std::cerr << "Usage: " << argv[0] << "[input_file] [lang] [array_name] [ output_file]\n";
 		return 1;
 	}
 
-	std::string const input_file(argv[1]);
-	std::string const output_file(argv[4]);
-	std::string const array_name(argv[2]);
-	std::string const lang(argv[3]);
+	std::string const input_file{ argv[1] }, output_file{ argv[4] }
+		, array_name{ argv[3] }, lang{ argv[2] };
 
 	//validate input with regexes
+	std::regex lang_reg{ "^[a-zA-Z_$][a-zA-Z_$0-9]*$"};
+	if (!std::regex_match(array_name.cbegin(), array_name.cend(), lang_reg)) {
+			std::cerr << "[*]Array name is invalid should start with valid characters\n";
+			return 1;
+	}
 
-	bool bSuccess = parse_pe_file(input_file) && 
+	bool bSuccess = g_Languages.find(lang) != g_Languages.end() && parse_pe_file(input_file) &&
 		generate_shellcode_array(output_file, array_name, lang);
 
-	bSuccess ? std::cout << "Successfully created shellcode array from pe file "<<
-		input_file << '\n': std::cerr << "Unable to parse pe file and create shellcode array\n";
+	bSuccess ? std::cout << "[*]Successfully created shellcode array from pe file "<<
+		input_file << '\n': std::cerr << "[*]Unable to parse pe file and create shellcode array\n";
 
 	delete g_pShellCode;
 	return 0;
