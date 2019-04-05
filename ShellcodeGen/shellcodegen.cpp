@@ -93,6 +93,7 @@ bool generate_shellcode_array(std::string const& save_to, std::string const& arr
 		std::cerr << "File " << save_to << " failed to open\n";
 		return false;
 	}
+	
 	out << "unsigned char " << arr_name.c_str() << " = {";
 	
 	PBYTE shellcode = new BYTE[g_pShellCode->shellcodeLen];
@@ -102,7 +103,7 @@ bool generate_shellcode_array(std::string const& save_to, std::string const& arr
 	if (dest == nullptr) {
 		return false;
 	}
-	for (unsigned int i = 0; i < g_pShellCode->shellcodeLen; i++) {
+	for (unsigned int i = 0; i < g_pShellCode->shellcodeLen, shellcode[i] != 0x0; i++) {
 		if (i != 0)out << ',';
 		if (i % 12)out << "\n\t";
 		out << std::hex << "0x" << shellcode[i];
