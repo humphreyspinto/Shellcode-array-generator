@@ -21,12 +21,15 @@ struct Shellcode {
 	size_t shellcodeLen{0};
 
 	~Shellcode() {
-		if(shellcodeData != nullptr)
+		if (shellcodeData != nullptr) {
 			delete[] shellcodeData;
+			shellcodeData = nullptr;
+		}
 	}
 };
 
-static Shellcode* g_pShellCode;
+static Shellcode* g_pShellCode{nullptr};
+
 static std::map<std::string const, LANG_ID> g_Languages{ {"python", LANG_ID::PYTHON}, 
 	{"cpp", LANG_ID::CPP}, {"vbscript", LANG_ID::VBSCRIPT}, {"javascript", LANG_ID::JAVASCRIPT}, 
 		{"powershell", LANG_ID::POWERSHELL} };
