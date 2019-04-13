@@ -1,6 +1,5 @@
 #include <windows.h>
 #include <iostream>
-#include <fstream>
 #include <map>
 #include <regex>
 #include <string>
@@ -13,7 +12,7 @@ enum class LANG_ID{
 	POWERSHELL,
 	JAVASCRIPT
 };
-//this is pinto
+
 struct Shellcode {
 	PVOID shellcodeData{nullptr};
 	size_t shellcodeLen{0};
@@ -68,7 +67,7 @@ bool parse_pe_file(std::string const& pe_file) {
 		if (number_of_sections == 1) {
 			char const* pSectionName = ".flat";
 			/*Get the .flat section if it exists in the pe file*/
-			SH = reinterpret_cast<PIMAGE_SECTION_HEADER>(DWORD(pBuffer) + DH->e_lfanew + 248);
+			SH = reinterpret_cast<PIMAGE_SECTION_HEADER>(DWORD(pBuffer) + DH->e_lfanew + 248); // get to first section offset
 			if (memcmp(SH->Name, pSectionName, strlen(pSectionName)) == 0) {
 				g_pShellCode->shellcodeData = new BYTE[SH->SizeOfRawData];
 				g_pShellCode->shellcodeLen = SH->SizeOfRawData;
@@ -79,7 +78,7 @@ bool parse_pe_file(std::string const& pe_file) {
 					return true;
 			}
 			else {
-				std::cerr << "[*].flat section not found.Exiting...\n";
+				std::cerr << "[*].flat section not found. Use flat assembler(fasm) to generate pe file from shellcode\n";
 				return false;
 			}
 		}
@@ -127,17 +126,20 @@ bool generate_shellcode_array(std::string const& save_to, std::string const& arr
 	PBYTE shellcode = new BYTE[g_pShellCode->shellcodeLen];
 	ZeroMemory(shellcode, g_pShellCode->shellcodeLen);
 
-	void* dest = memcpy(shellcode, reinterpret_cast<PBYTE>(g_pShellCode->shellcodeData), g_pShellCode->shellcodeLen);
+	void* dest = memcpy(shellcode, reinterpret_cast<PBYTE>(g_pShellCode->shellcodeData), 
+		g_pShellCode->shellcodeLen);
+
 	if (dest == nullptr) {
 		return false;
 	}
 
 	fprintf_s(out_s, arr_fmt.first.c_str());
-	for (unsigned int i = 0; i < g_pShellCode->shellcodeLen, shellcode[i] != 0x0; i++) {
+
+	for (unsigned int i = 0; i < g_pShellCode->shellcodeLen, shellcode[i] != 0x00; i++) {
 		if (i != 0)
-			fprintf(out_s, ", ");
-		if (i % 12 == 0)
-			fprintf(out_s, "\n\t");
+			fprintf_s(out_s, ", ");
+		if (i % 12 == 0) // each row will have 12 elements
+			fprintf_s(out_s, "\n\t");
 		fprintf_s(out_s, "0x%.2x", static_cast<BYTE>(shellcode[i]));
 	}
 
@@ -150,8 +152,8 @@ bool generate_shellcode_array(std::string const& save_to, std::string const& arr
 }
 
 int main(int argc, char** argv) {
-	if (argc < 2) {
-		std::cerr << "Usage: " << argv[0] << "[input_file] [lang] [array_name] [ output_file]\n";
+	if (argc < 5) {
+		std::cerr << "Usage: " << argv[0] << " [input_file] [lang] [array_name] [ output_file]\n";
 		return 1;
 	}
 
@@ -165,6 +167,8 @@ int main(int argc, char** argv) {
 			return 1;
 	}
 	g_pShellCode = new Shellcode();
+	ZeroMemory(g_pShellCode, sizeof(Shellcode));
+
 	auto lang_pair = g_Languages.find(lang);
 
 	bool bSuccess =  lang_pair != g_Languages.end() && parse_pe_file(input_file) &&
