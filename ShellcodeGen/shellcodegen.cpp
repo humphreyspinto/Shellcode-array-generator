@@ -13,7 +13,7 @@ enum class LANG_ID{
 	POWERSHELL,
 	JAVASCRIPT
 };
-
+//this is pinto
 struct Shellcode {
 	PVOID shellcodeData{nullptr};
 	size_t shellcodeLen{0};
