@@ -6,8 +6,6 @@
 #include <string>
 #include <string.h>
 
-#pragma warning(disable: 4996)
-
 enum class LANG_ID{
 	PYTHON,
 	CPP,
@@ -110,8 +108,8 @@ bool generate_shellcode_array(std::string const& save_to, std::string const& arr
 		arr_fmt.second = "\n};\n";
 		break;
 	case LANG_ID::POWERSHELL:
-		arr_fmt.first = "";
-		arr_fmt.second = "";
+		arr_fmt.first = "[Byte[]] " + arr_name + " = @(";
+		arr_fmt.second = "\n)";
 		break;
 	case LANG_ID::PYTHON:
 		arr_fmt.first = arr_name + " = [";
